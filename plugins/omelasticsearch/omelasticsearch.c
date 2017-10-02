@@ -99,6 +99,7 @@ typedef struct _instanceData {
 	uchar *tplName;
 	uchar *timeout;
 	uchar *bulkId;
+	uchar *pipelineId;
 	uchar *errorFile;
 	sbool errorOnly;
 	sbool interleaved;
@@ -146,7 +147,7 @@ static struct cnfparamdescr actpdescr[] = {
 	{ "bulkmode", eCmdHdlrBinary, 0 },
 	{ "maxbytes", eCmdHdlrSize, 0 },
 	{ "asyncrepl", eCmdHdlrGoneAway, 0 },
-        { "usehttps", eCmdHdlrBinary, 0 },
+    { "usehttps", eCmdHdlrBinary, 0 },
 	{ "timeout", eCmdHdlrGetWord, 0 },
 	{ "errorfile", eCmdHdlrGetWord, 0 },
 	{ "erroronly", eCmdHdlrBinary, 0 },
@@ -154,6 +155,7 @@ static struct cnfparamdescr actpdescr[] = {
 	{ "template", eCmdHdlrGetWord, 0 },
 	{ "dynbulkid", eCmdHdlrBinary, 0 },
 	{ "bulkid", eCmdHdlrGetWord, 0 },
+	{ "pipelineid", eCmdHdlrGetWord, 0 },
 	{ "allowunsignedcerts", eCmdHdlrBinary, 0 }
 };
 static struct cnfparamblk actpblk =
@@ -216,6 +218,7 @@ CODESTARTfreeInstance
 	free(pData->timeout);
 	free(pData->errorFile);
 	free(pData->bulkId);
+	free(pData->pipelineId);
 ENDfreeInstance
 
 BEGINfreeWrkrInstance
@@ -270,6 +273,7 @@ CODESTARTdbgPrintInstInfo
 	dbgprintf("\tinterleaved=%d\n", pData->interleaved);
 	dbgprintf("\tdynbulkid=%d\n", pData->dynBulkId);
 	dbgprintf("\tbulkid='%s'\n", pData->bulkId);
+	dbgprintf("\tpipelineid='%s'\n", pData->pipelineId);
 ENDdbgPrintInstInfo
 
 
@@ -519,6 +523,13 @@ setPostURL(wrkrInstanceData_t *pWrkrData, instanceData *pData, uchar **tpls)
 	if(parent != NULL) {
 		if(r == 0) r = es_addChar(&url, separator);
 		if(r == 0) r = es_addBuf(&url, "parent=", sizeof("parent=")-1);
+		if(r == 0) es_addBuf(&url, (char*)parent, ustrlen(parent));
+		separator = '&';
+	}
+
+	if(pData->pipelineId != NULL) {
+		if(r == 0) r = es_addChar(&url, separator);
+		if(r == 0) r = es_addBuf(&url, "pipeline=", sizeof("pipeline=")-1);
 		if(r == 0) es_addBuf(&url, (char*)parent, ustrlen(parent));
 	}
 
@@ -1375,6 +1386,7 @@ setInstParamDefaults(instanceData *pData)
 	pData->interleaved=0;
 	pData->dynBulkId= 0;
 	pData->bulkId = NULL;
+	pData->pipelineId = NULL;
 }
 
 BEGINnewActInst
@@ -1438,6 +1450,8 @@ CODESTARTnewActInst
 			pData->dynBulkId = pvals[i].val.d.n;
 		} else if(!strcmp(actpblk.descr[i].name, "bulkid")) {
 			pData->bulkId = (uchar*)es_str2cstr(pvals[i].val.d.estr, NULL);
+		} else if(!strcmp(actpblk.descr[i].name, "pipelineid")) {
+			pData->pipelineId = (uchar*)es_str2cstr(pvals[i].val.d.estr, NULL);
 		} else {
 			dbgprintf("omelasticsearch: program error, non-handled "
 			  "param '%s'\n", actpblk.descr[i].name);
